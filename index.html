@@ -2,7 +2,7 @@
 </div>
 
 <script>
-/* TIDE WIDGET - STANDALONE (Final Compact Dynamic UI) */
+/* TIDE WIDGET - STANDALONE (Final Compact Dynamic UI - Responsiveness Fixed) */
 (function(){
     // API Endpoints and Default Location (Kolkata)
     const API_OM = 'https://api.open-meteo.com/v1/forecast';
@@ -15,11 +15,11 @@
         tide_anchor_fallback: '20:30', 
     };
 
+    // Initialize STATE with default data
     let STATE = { lat: DEFAULT.lat, lng: DEFAULT.lng, source: DEFAULT.source, city: DEFAULT.city, tides:[] };
     let updateTimeInterval = null; 
-    let updateUIInterval = null; // New interval for updating level & highlights
-    let updateDataInterval = null; // For refreshing API data
-    
+    let updateDataInterval = null;
+
     // --- Localization and Formatting ---
     function formatToBengali(dateInput, isTime = false, showSeconds = false) {
         if (!dateInput) return '—';
@@ -86,13 +86,11 @@
     // Creates the glowing up/down arrow indicator
     function createGlowArrow(direction, size = '1.1em') {
         const arrow = direction === 'up' ? '▲' : '▼';
-        // Red for falling tide (ভাটা), Green for rising tide (জোয়ার)
         const color = direction === 'up' ? '#32CD32' : '#FF4500'; 
         const shadow = `0 0 5px ${color}, 0 0 10px ${color}`;
 
         return `<span style="font-size: ${size}; color: ${color}; text-shadow: ${shadow}; margin-left: 5px; position: relative; top: ${direction === 'up' ? '-2px' : '2px'};">${arrow}</span>`;
     }
-
 
     // --- Engine Logic ---
     async function loadCoordinates() {
@@ -118,7 +116,6 @@
         const gap = (6 * 60 + 12) * 60000; 
         const out = [];
         
-        // Sequence: High Tide, Low Tide, High Tide, Low Tide
         const types = ['উচ্চ জোয়ার', 'নিম্ন ভাটা', 'উচ্চ জোয়ার', 'নিম্ন ভাটা']; 
         
         for(let i=0; i < 4; i++){
@@ -152,7 +149,6 @@
             }
         }
         
-        // Handle wrap-around for the next day's first event
         if (!nextEvent && tides.length > 0) {
             nextEvent = tides[0]; 
             closestPastEvent = tides[tides.length - 1]; 
@@ -161,11 +157,16 @@
             const tomorrow = new Date();
             tomorrow.setDate(tomorrow.getDate() + 1);
             
+            // Re-calculating timestamp for wrap-around case to ensure time interpolation works across midnight
             nextEvent.timestamp = parseBengaliTime(nextEvent.time, tomorrow).getTime();
             closestPastEvent.timestamp = parseBengaliTime(closestPastEvent.time, new Date()).getTime();
+            
+            // If the next event time is still in the past (e.g., if the user started the widget at 12:05 AM and the first event was 12:00 AM), we need to manually adjust the next event to tomorrow.
+            if(nextEvent.timestamp < now) {
+                nextEvent.timestamp += 86400000; // Add 24 hours
+            }
         }
         
-        // Use 5% and 95% as visual anchors for Low/High
         const levelStart = closestPastEvent && closestPastEvent.level === 'high' ? 95 : 5;
         const levelEnd = nextEvent && nextEvent.level === 'high' ? 95 : 5;
         
@@ -177,8 +178,18 @@
             const timeDiff = nextEvent.timestamp - closestPastEvent.timestamp;
             const levelDiff = levelEnd - levelStart;
             const timeElapsed = now - closestPastEvent.timestamp;
+            
+            // Crucial check: only interpolate if time has elapsed
+            if(timeElapsed >= 0 && timeElapsed <= timeDiff) {
+                currentLevel = levelStart + (levelDiff * (timeElapsed / timeDiff));
+            } else if (timeElapsed > timeDiff) {
+                 // Should not happen if logic is correct, but cap to end level
+                 currentLevel = levelEnd;
+            } else {
+                // If timeElapsed is negative (shouldn't happen with correct anchor logic), stick to start level
+                currentLevel = levelStart;
+            }
 
-            currentLevel = levelStart + (levelDiff * (timeElapsed / timeDiff));
             
             if (levelStart === 95 && levelEnd === 5) {
                 direction = 'down'; // High to Low (ভাটার দিকে)
@@ -187,7 +198,7 @@
             }
         } 
         
-        currentLevel = Math.max(5, Math.min(95, currentLevel)); // Clamp level
+        currentLevel = Math.max(5, Math.min(95, currentLevel)); 
 
         return { 
             level: Math.round(currentLevel), 
@@ -285,7 +296,7 @@
                 }
                 .tide-time-value { 
                     font-weight: 800; 
-                    font-size: 1.05em; /* Increased font size for time */
+                    font-size: 1.05em; /* Increased font size */
                     color: #FFEB3B !important; 
                     white-space: nowrap; 
                     margin-top: 2px;
@@ -297,7 +308,7 @@
                      border-radius: 4px;
                      padding: 6px;
                      margin: 4px -6px;
-                     box-shadow: 0 0 8px rgba(255, 235, 59, 0.5); /* Yellow glow */
+                     box-shadow: 0 0 8px rgba(255, 235, 59, 0.5); 
                 }
 
                 /* Footer Section */
@@ -343,7 +354,7 @@
                     left: 0;
                     width: 100%;
                     background: linear-gradient(to top, #A9E4FF 0%, #00BFFF 100%); 
-                    transition: height 0.5s ease-out; /* Faster transition for visual responsiveness */
+                    transition: height 0.5s ease-out; 
                     border-top: 3px solid #FFFFFF;
                 }
                 .water-level-text {
@@ -359,41 +370,12 @@
                 }
             </style>
         `;
-
-        // --- 2. Tide HTML ---
-        const nextEventIndex = dynamicLevelInfo.nextEventIndex;
-        const currentDirection = dynamicLevelInfo.direction;
-        
-        let tideListHTML = '';
-        if (data.tides && data.tides.length) {
-            data.tides.forEach((t, index) => {
-                const isHighlight = index === nextEventIndex;
-                const highlightClass = isHighlight ? 'highlight' : '';
-                
-                // Show arrow direction on the type name for visual aid
-                const arrowIndicator = isHighlight && currentDirection !== 'static' ? createGlowArrow(currentDirection, '0.9em') : '';
-                
-                tideListHTML += `
-                    <div class="tide-item-compact ${highlightClass}">
-                        <span class="tide-label-group">
-                            <div class="tide-icon-svg">${createWaveSVG()}</div>
-                            <div class="tide-text-stack">
-                                <span class="tide-type-value">${t.type}${arrowIndicator}</span>
-                                <span class="tide-time-value">${t.time || '—'}</span>
-                            </div>
-                        </span>
-                    </div>
-                `;
-            });
-        } else {
-             tideListHTML = `<div class="tide-item-compact"><span>তথ্য পাওয়া যায়নি।</span><span>—</span></div>`;
-        }
         
         // Initial Local Time
         const initialLocalTime = formatToBengali(new Date(), true, true);
         
         // Indicator for the top of the water panel
-        const panelArrow = currentDirection !== 'static' ? createGlowArrow(currentDirection, '1.4em') : '';
+        const panelArrow = dynamicLevelInfo.direction !== 'static' ? createGlowArrow(dynamicLevelInfo.direction, '1.4em') : '';
 
         const tideHTML = `
             <div class="tide-panel">
@@ -401,12 +383,12 @@
                     <div class="tide-header-section">
                         <div class="tide-header-title">জোয়ার-ভাটা</div>
                         <div class="level-indicator-label" style="text-align: right; margin-right: 5px;">
-                            ${panelArrow}<br>
+                            <span id="panel-arrow-indicator">${panelArrow}</span><br>
                             <span style="font-size: 0.7em;">বর্তমান জলস্তর</span>
                         </div>
                     </div>
                     
-                    <div class="tide-events-list" id="tide-events-list">${tideListHTML}</div>
+                    <div class="tide-events-list" id="tide-events-list">${buildTideList(data.tides, dynamicLevelInfo)}</div>
                     
                     <div class="footer-tags-section">
                         <div class="tide-date-footer">আজ: ${currentDateBengali}</div>
@@ -428,36 +410,6 @@
         `;
         
         return css + tideHTML;
-    }
-    
-    // --- UI Update Function (Runs frequently for smooth movement) ---
-    function updateLiveUI() {
-        const timeElement = $('local-time-live');
-        if (timeElement) {
-            timeElement.textContent = formatToBengali(new Date(), true, true);
-        }
-
-        const fillElement = $('water-fill');
-        const textElement = $('water-level-text');
-        
-        if (fillElement && textElement) {
-            const dynamicLevelInfo = getDynamicLevelInfo(STATE.tides);
-            
-            // Update percentage and height
-            fillElement.style.height = `${dynamicLevelInfo.level}%`;
-            textElement.textContent = `${dynamicLevelInfo.level}%`;
-            
-            // Re-render the whole list to update highlights and arrows based on current direction
-            const listElement = $('tide-events-list');
-            if (listElement) {
-                 // We only need to rebuild if the active event/direction has changed, 
-                 // but for simplicity and safety, we rebuild the list structure here.
-                 // This ensures the current state (highlight/arrow) is always correct.
-                 const tempDiv = document.createElement('div');
-                 tempDiv.innerHTML = buildTideList(STATE.tides, dynamicLevelInfo);
-                 listElement.innerHTML = tempDiv.innerHTML;
-            }
-        }
     }
     
     // Function to only rebuild the tide list items (Used by updateLiveUI)
@@ -489,6 +441,34 @@
              tideListHTML = `<div class="tide-item-compact"><span>তথ্য পাওয়া যায়নি।</span><span>—</span></div>`;
         }
         return tideListHTML;
+    }
+
+    // --- UI Update Function (Runs very frequently for smooth movement) ---
+    function updateLiveUI() {
+        const timeElement = $('local-time-live');
+        if (timeElement) {
+            timeElement.textContent = formatToBengali(new Date(), true, true);
+        }
+
+        const fillElement = $('water-fill');
+        const textElement = $('water-level-text');
+        const listElement = $('tide-events-list');
+        const panelArrowElement = $('panel-arrow-indicator');
+        
+        if (fillElement && textElement && listElement && panelArrowElement) {
+            const dynamicLevelInfo = getDynamicLevelInfo(STATE.tides);
+            
+            // Update percentage and height
+            fillElement.style.height = `${dynamicLevelInfo.level}%`;
+            textElement.textContent = `${dynamicLevelInfo.level}%`;
+            
+            // Update the tide list for correct highlighting and event-specific arrows
+            const newTideListHTML = buildTideList(STATE.tides, dynamicLevelInfo);
+            listElement.innerHTML = newTideListHTML;
+            
+            // Update the main panel arrow indicator
+            panelArrowElement.innerHTML = dynamicLevelInfo.direction !== 'static' ? createGlowArrow(dynamicLevelInfo.direction, '1.4em') : '';
+        }
     }
 
     // --- Main Loader Function ---
@@ -524,7 +504,7 @@
         if (targetElement) { targetElement.innerHTML = buildWidget(STATE); }
         
         // Start the continuous UI update intervals if not already running
-        if (!updateTimeInterval) updateTimeInterval = setInterval(updateLiveUI, 500); // UI updates every 0.5 sec
+        if (!updateTimeInterval) updateTimeInterval = setInterval(updateLiveUI, 100); // 100ms update for smooth movement
         
         // Set the main data refresh interval (every 30 minutes)
         updateDataInterval = setInterval(loadAllData, 1800000); 
@@ -532,4 +512,4 @@
 
     loadAllData();
 })();
-</script>
+</script> 
