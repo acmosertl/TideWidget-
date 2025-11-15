@@ -1,0 +1,535 @@
+<div id="madhabam-tide-widget" style="max-width:300px;">
+</div>
+
+<script>
+/* TIDE WIDGET - STANDALONE (Final Compact Dynamic UI) */
+(function(){
+    // API Endpoints and Default Location (Kolkata)
+    const API_OM = 'https://api.open-meteo.com/v1/forecast';
+    const API_IP = 'https://ipapi.co/json/';
+    const DEFAULT = { lat:22.57, lng:88.36, source:'স্থির স্থানাঙ্ক', city:'কলকাতা' };
+    const $ = id => document.getElementById(id);
+    
+    // Fallback Data
+    const FALLBACK_DATA = {
+        tide_anchor_fallback: '20:30', 
+    };
+
+    let STATE = { lat: DEFAULT.lat, lng: DEFAULT.lng, source: DEFAULT.source, city: DEFAULT.city, tides:[] };
+    let updateTimeInterval = null; 
+    let updateUIInterval = null; // New interval for updating level & highlights
+    let updateDataInterval = null; // For refreshing API data
+    
+    // --- Localization and Formatting ---
+    function formatToBengali(dateInput, isTime = false, showSeconds = false) {
+        if (!dateInput) return '—';
+        try {
+            const date = (dateInput instanceof Date) ? dateInput : new Date(dateInput);
+            if (isNaN(date)) return '—';
+            
+            const options = { timeZone: 'Asia/Kolkata' };
+            
+            if (isTime) {
+                options.hour = '2-digit'; 
+                options.minute = '2-digit';
+                if (showSeconds) options.second = '2-digit'; 
+                options.hour12 = true;
+                return date.toLocaleTimeString('bn-BD', options);
+            }
+            options.day = '2-digit';
+            options.month = '2-digit';
+            options.year = 'numeric';
+            return date.toLocaleDateString('bn-BD', options).replace(/\//g, '-');
+        } catch (e) {
+            return '—';
+        }
+    }
+    
+    // Convert Bengali Time String to JavaScript Date Object
+    function parseBengaliTime(timeStr, dateContext) {
+        try {
+            const parts = timeStr.split(' ');
+            if (parts.length !== 2) return null;
+
+            const [timePart, ampm] = parts;
+            let [h, m] = timePart.split(':').map(Number);
+            
+            if (ampm === 'PM' && h !== 12) h += 12;
+            if (ampm === 'AM' && h === 12) h = 0;
+            
+            let date = dateContext || new Date();
+            date.setHours(h, m, 0, 0);
+            return date;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    // --- Dynamic SVG Helpers (Tide and Arrow) ---
+    function createWaveSVG() {
+        const ns = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(ns, 'svg');
+        svg.setAttribute('width', '24'); svg.setAttribute('height', '24'); svg.setAttribute('viewBox', '0 0 24 24');
+
+        const style = document.createElementNS(ns, 'style');
+        style.textContent = `
+            .wave { fill: none; stroke: #FFF; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; animation: wave-motion 2s linear infinite alternate; }
+            @keyframes wave-motion { 0% { transform: translateY(0px); } 100% { transform: translateY(-2px); } }
+        `;
+        svg.appendChild(style);
+        const path1 = document.createElementNS(ns, 'path'); path1.setAttribute('class', 'wave'); path1.setAttribute('d', 'M2 12s2-2 4-2 4 2 4 2 2-2 4-2 4 2 4 2'); svg.appendChild(path1);
+        const path2 = document.createElementNS(ns, 'path'); path2.setAttribute('class', 'wave'); path2.setAttribute('d', 'M2 16s2-2 4-2 4 2 4 2 2-2 4-2 4 2 4 2'); path2.style.animationDelay = '-1s'; svg.appendChild(path2);
+
+        return svg.outerHTML;
+    }
+    
+    // Creates the glowing up/down arrow indicator
+    function createGlowArrow(direction, size = '1.1em') {
+        const arrow = direction === 'up' ? '▲' : '▼';
+        // Red for falling tide (ভাটা), Green for rising tide (জোয়ার)
+        const color = direction === 'up' ? '#32CD32' : '#FF4500'; 
+        const shadow = `0 0 5px ${color}, 0 0 10px ${color}`;
+
+        return `<span style="font-size: ${size}; color: ${color}; text-shadow: ${shadow}; margin-left: 5px; position: relative; top: ${direction === 'up' ? '-2px' : '2px'};">${arrow}</span>`;
+    }
+
+
+    // --- Engine Logic ---
+    async function loadCoordinates() {
+        try {
+            const response = await fetch(API_IP);
+            const data = await response.json();
+            if (data.latitude && data.longitude) {
+                return { lat: data.latitude, lng: data.longitude, source: 'IP Address', city: data.city || 'IP Location' };
+            }
+        } catch (e2) {}
+        return DEFAULT;
+    }
+    
+    function approxTides(baseTime){
+        let base = new Date();
+        if(baseTime && baseTime.includes('T')) base = new Date(baseTime);
+        else if(baseTime) { 
+             const d=new Date(); 
+             const [h, m] = baseTime.split(':').map(Number);
+             base = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m, 0);
+        }
+        
+        const gap = (6 * 60 + 12) * 60000; 
+        const out = [];
+        
+        // Sequence: High Tide, Low Tide, High Tide, Low Tide
+        const types = ['উচ্চ জোয়ার', 'নিম্ন ভাটা', 'উচ্চ জোয়ার', 'নিম্ন ভাটা']; 
+        
+        for(let i=0; i < 4; i++){
+            let t = new Date(base.getTime() + i * gap); 
+            out.push({ 
+                type: types[i], 
+                time: formatToBengali(t, true),
+                level: (i % 2 === 0) ? 'high' : 'low', 
+                timestamp: t.getTime() 
+            }); 
+        }
+        
+        return out.sort((a, b) => a.timestamp - b.timestamp);
+    }
+    
+    // --- Current Water Level Calculation (Crucial for Responsiveness) ---
+    function getDynamicLevelInfo(tides, checkTime) {
+        const now = checkTime || new Date().getTime();
+        let closestPastEvent = null;
+        let nextEvent = null;
+        let nextEventIndex = -1;
+
+        for(let i = 0; i < tides.length; i++) {
+            if (tides[i].timestamp <= now) {
+                closestPastEvent = tides[i];
+                nextEvent = tides[i+1];
+                nextEventIndex = i+1;
+            } else if (!nextEvent) {
+                nextEvent = tides[i];
+                nextEventIndex = i;
+            }
+        }
+        
+        // Handle wrap-around for the next day's first event
+        if (!nextEvent && tides.length > 0) {
+            nextEvent = tides[0]; 
+            closestPastEvent = tides[tides.length - 1]; 
+            nextEventIndex = 0;
+            
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            
+            nextEvent.timestamp = parseBengaliTime(nextEvent.time, tomorrow).getTime();
+            closestPastEvent.timestamp = parseBengaliTime(closestPastEvent.time, new Date()).getTime();
+        }
+        
+        // Use 5% and 95% as visual anchors for Low/High
+        const levelStart = closestPastEvent && closestPastEvent.level === 'high' ? 95 : 5;
+        const levelEnd = nextEvent && nextEvent.level === 'high' ? 95 : 5;
+        
+        let currentLevel = 50; 
+        let direction = 'static'; 
+
+        // Linear Interpolation
+        if (closestPastEvent && nextEvent && nextEvent.timestamp > closestPastEvent.timestamp) {
+            const timeDiff = nextEvent.timestamp - closestPastEvent.timestamp;
+            const levelDiff = levelEnd - levelStart;
+            const timeElapsed = now - closestPastEvent.timestamp;
+
+            currentLevel = levelStart + (levelDiff * (timeElapsed / timeDiff));
+            
+            if (levelStart === 95 && levelEnd === 5) {
+                direction = 'down'; // High to Low (ভাটার দিকে)
+            } else if (levelStart === 5 && levelEnd === 95) {
+                direction = 'up'; // Low to High (জোয়ারের দিকে)
+            }
+        } 
+        
+        currentLevel = Math.max(5, Math.min(95, currentLevel)); // Clamp level
+
+        return { 
+            level: Math.round(currentLevel), 
+            direction: direction, 
+            nextEventIndex: nextEventIndex 
+        }; 
+    }
+
+    // --- Master Render Function: Builds all HTML and CSS ---
+    function buildWidget(data) {
+        
+        const currentDateBengali = formatToBengali(new Date(), false);
+        const dynamicLevelInfo = getDynamicLevelInfo(data.tides);
+        
+        // --- 1. CSS Styles ---
+        const css = `
+            <style>
+                #madhabam-tide-widget *{ 
+                    box-sizing: border-box; 
+                    font-family: 'Noto Sans Bengali', 'Kalpurush', 'SolaimanLipi', sans-serif !important; 
+                    line-height: 1.1; 
+                    color: #333; 
+                }
+                .tide-panel { 
+                    background-color: #006f7a; 
+                    color: white; 
+                    border-radius: 12px; 
+                    padding: 15px; 
+                    margin-bottom: 15px; 
+                    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15); 
+                    display: flex; 
+                    gap: 10px; 
+                    height: auto; 
+                    min-height: 350px;
+                    overflow: hidden; 
+                }
+                .tide-panel * { color: white !important; }
+                
+                /* Tide Content Section (left side) */
+                .tide-content { 
+                    flex-grow: 1; 
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: space-between; 
+                    min-width: 0; 
+                }
+                
+                .tide-header-section { 
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-end;
+                    margin-bottom: 10px; 
+                }
+                .tide-header-title { 
+                    font-weight: 900; 
+                    font-size: 1.45em; 
+                    color: #FFEB3B !important; 
+                }
+                
+                .tide-events-list { 
+                    flex-grow: 1; 
+                    margin-bottom: 10px; 
+                }
+
+                .tide-item-compact { 
+                    display: flex; 
+                    justify-content: space-between; 
+                    align-items: center; 
+                    font-size: 1.0em; 
+                    padding: 5px 0; 
+                    margin: 4px 0;
+                    border-bottom: 1px dotted rgba(255, 255, 255, 0.1);
+                    transition: all 0.3s;
+                    position: relative;
+                }
+                
+                /* Compact Layout: Time below Type */
+                .tide-label-group { 
+                    display: flex; 
+                    align-items: center; 
+                    gap: 5px; 
+                    font-weight: 600; 
+                    white-space: nowrap; 
+                }
+                .tide-text-stack {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: flex-start;
+                    line-height: 1;
+                    padding-left: 2px;
+                }
+                .tide-type-value {
+                    font-weight: 700;
+                    font-size: 1.1em;
+                }
+                .tide-time-value { 
+                    font-weight: 800; 
+                    font-size: 1.05em; /* Increased font size for time */
+                    color: #FFEB3B !important; 
+                    white-space: nowrap; 
+                    margin-top: 2px;
+                } 
+                
+                /* Glowing Highlight for the current/next phase */
+                .tide-item-compact.highlight {
+                     background-color: rgba(255, 255, 255, 0.2); 
+                     border-radius: 4px;
+                     padding: 6px;
+                     margin: 4px -6px;
+                     box-shadow: 0 0 8px rgba(255, 235, 59, 0.5); /* Yellow glow */
+                }
+
+                /* Footer Section */
+                .footer-tags-section {
+                    padding-top: 10px;
+                    border-top: 1px solid rgba(255, 255, 255, 0.4);
+                }
+                .tide-date-footer {
+                    font-size: 0.9em;
+                    font-weight: 700; 
+                    color: #A9E4FF !important;
+                    margin-bottom: 5px;
+                }
+                .location-time-tag { 
+                    text-align: left; 
+                    font-size: 0.9em; 
+                    font-weight: 600; 
+                }
+                .location-time-tag span { font-weight: 800; color: #e6c300 !important; }
+                
+                /* --- Level Indicator CSS (Right Side) --- */
+                .level-indicator-container {
+                    width: 50px; 
+                    min-width: 50px;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    padding-top: 10px;
+                    padding-bottom: 10px;
+                }
+                .level-indicator-bar {
+                    flex-grow: 1; 
+                    width: 35px; 
+                    border: 3px solid #FFFFFF;
+                    border-radius: 12px;
+                    background-color: rgba(255, 255, 255, 0.2);
+                    overflow: hidden;
+                    position: relative;
+                }
+                .water-fill {
+                    position: absolute;
+                    bottom: 0;
+                    left: 0;
+                    width: 100%;
+                    background: linear-gradient(to top, #A9E4FF 0%, #00BFFF 100%); 
+                    transition: height 0.5s ease-out; /* Faster transition for visual responsiveness */
+                    border-top: 3px solid #FFFFFF;
+                }
+                .water-level-text {
+                    position: absolute;
+                    top: 50%; 
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    font-size: 0.8em;
+                    font-weight: 900;
+                    color: #006f7a !important; 
+                    z-index: 10;
+                    transition: opacity 0.5s;
+                }
+            </style>
+        `;
+
+        // --- 2. Tide HTML ---
+        const nextEventIndex = dynamicLevelInfo.nextEventIndex;
+        const currentDirection = dynamicLevelInfo.direction;
+        
+        let tideListHTML = '';
+        if (data.tides && data.tides.length) {
+            data.tides.forEach((t, index) => {
+                const isHighlight = index === nextEventIndex;
+                const highlightClass = isHighlight ? 'highlight' : '';
+                
+                // Show arrow direction on the type name for visual aid
+                const arrowIndicator = isHighlight && currentDirection !== 'static' ? createGlowArrow(currentDirection, '0.9em') : '';
+                
+                tideListHTML += `
+                    <div class="tide-item-compact ${highlightClass}">
+                        <span class="tide-label-group">
+                            <div class="tide-icon-svg">${createWaveSVG()}</div>
+                            <div class="tide-text-stack">
+                                <span class="tide-type-value">${t.type}${arrowIndicator}</span>
+                                <span class="tide-time-value">${t.time || '—'}</span>
+                            </div>
+                        </span>
+                    </div>
+                `;
+            });
+        } else {
+             tideListHTML = `<div class="tide-item-compact"><span>তথ্য পাওয়া যায়নি।</span><span>—</span></div>`;
+        }
+        
+        // Initial Local Time
+        const initialLocalTime = formatToBengali(new Date(), true, true);
+        
+        // Indicator for the top of the water panel
+        const panelArrow = currentDirection !== 'static' ? createGlowArrow(currentDirection, '1.4em') : '';
+
+        const tideHTML = `
+            <div class="tide-panel">
+                <div class="tide-content">
+                    <div class="tide-header-section">
+                        <div class="tide-header-title">জোয়ার-ভাটা</div>
+                        <div class="level-indicator-label" style="text-align: right; margin-right: 5px;">
+                            ${panelArrow}<br>
+                            <span style="font-size: 0.7em;">বর্তমান জলস্তর</span>
+                        </div>
+                    </div>
+                    
+                    <div class="tide-events-list" id="tide-events-list">${tideListHTML}</div>
+                    
+                    <div class="footer-tags-section">
+                        <div class="tide-date-footer">আজ: ${currentDateBengali}</div>
+                        <div class="location-time-tag">
+                            স্থান: <span>${data.city}</span> | স্থানীয় সময়: <span id="local-time-live">${initialLocalTime}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="level-indicator-container">
+                    
+                    <div class="level-indicator-bar">
+                        <div class="water-level-text" id="water-level-text">${dynamicLevelInfo.level}%</div>
+                        <div class="water-fill" id="water-fill" style="height: ${dynamicLevelInfo.level}%;">
+                            </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        return css + tideHTML;
+    }
+    
+    // --- UI Update Function (Runs frequently for smooth movement) ---
+    function updateLiveUI() {
+        const timeElement = $('local-time-live');
+        if (timeElement) {
+            timeElement.textContent = formatToBengali(new Date(), true, true);
+        }
+
+        const fillElement = $('water-fill');
+        const textElement = $('water-level-text');
+        
+        if (fillElement && textElement) {
+            const dynamicLevelInfo = getDynamicLevelInfo(STATE.tides);
+            
+            // Update percentage and height
+            fillElement.style.height = `${dynamicLevelInfo.level}%`;
+            textElement.textContent = `${dynamicLevelInfo.level}%`;
+            
+            // Re-render the whole list to update highlights and arrows based on current direction
+            const listElement = $('tide-events-list');
+            if (listElement) {
+                 // We only need to rebuild if the active event/direction has changed, 
+                 // but for simplicity and safety, we rebuild the list structure here.
+                 // This ensures the current state (highlight/arrow) is always correct.
+                 const tempDiv = document.createElement('div');
+                 tempDiv.innerHTML = buildTideList(STATE.tides, dynamicLevelInfo);
+                 listElement.innerHTML = tempDiv.innerHTML;
+            }
+        }
+    }
+    
+    // Function to only rebuild the tide list items (Used by updateLiveUI)
+    function buildTideList(tides, dynamicLevelInfo) {
+        let tideListHTML = '';
+        const nextEventIndex = dynamicLevelInfo.nextEventIndex;
+        const currentDirection = dynamicLevelInfo.direction;
+
+        if (tides && tides.length) {
+            tides.forEach((t, index) => {
+                const isHighlight = index === nextEventIndex;
+                const highlightClass = isHighlight ? 'highlight' : '';
+                
+                const arrowIndicator = isHighlight && currentDirection !== 'static' ? createGlowArrow(currentDirection, '0.9em') : '';
+                
+                tideListHTML += `
+                    <div class="tide-item-compact ${highlightClass}">
+                        <span class="tide-label-group">
+                            <div class="tide-icon-svg">${createWaveSVG()}</div>
+                            <div class="tide-text-stack">
+                                <span class="tide-type-value">${t.type}${arrowIndicator}</span>
+                                <span class="tide-time-value">${t.time || '—'}</span>
+                            </div>
+                        </span>
+                    </div>
+                `;
+            });
+        } else {
+             tideListHTML = `<div class="tide-item-compact"><span>তথ্য পাওয়া যায়নি।</span><span>—</span></div>`;
+        }
+        return tideListHTML;
+    }
+
+    // --- Main Loader Function ---
+    async function loadAllData() {
+        // Clear previous data update interval
+        if (updateDataInterval) clearInterval(updateDataInterval);
+        
+        const coords = await loadCoordinates();
+        STATE.lat = coords.lat;
+        STATE.lng = coords.lng;
+        STATE.source = coords.source;
+        STATE.city = coords.city;
+        
+        let raw_moonrise = null;
+
+        // Fetch Moonrise Time
+        try {
+            const r2 = await fetch(API_OM + `?latitude=${STATE.lat}&longitude=${STATE.lng}&daily=moonrise&timezone=auto`);
+            const j2 = r2.ok ? await r2.json() : {};
+            if(j2.daily && j2.daily.moonrise && j2.daily.moonrise.length && j2.daily.moonrise[0] && j2.daily.moonrise[0] !== null){
+                raw_moonrise = j2.daily.moonrise[0];
+            } else {
+                raw_moonrise = FALLBACK_DATA.tide_anchor_fallback;
+            }
+        } catch(e) {
+            raw_moonrise = FALLBACK_DATA.tide_anchor_fallback;
+        }
+
+        STATE.tides = approxTides(raw_moonrise || new Date()); 
+        
+        // Initial full render with new data
+        const targetElement = $('madhabam-tide-widget');
+        if (targetElement) { targetElement.innerHTML = buildWidget(STATE); }
+        
+        // Start the continuous UI update intervals if not already running
+        if (!updateTimeInterval) updateTimeInterval = setInterval(updateLiveUI, 500); // UI updates every 0.5 sec
+        
+        // Set the main data refresh interval (every 30 minutes)
+        updateDataInterval = setInterval(loadAllData, 1800000); 
+    }
+
+    loadAllData();
+})();
+</script>
