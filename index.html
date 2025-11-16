@@ -1,248 +1,585 @@
-<!DOCTYPE html>
-<html lang="bn">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Madhabam Tide Widget</title>
+<div class="tide-widget">
+    <div class="widget-header">
+        <div class="tide-title">জোয়ার-ভাটা</div>
+        <div class="level-title-flex">
+            <div id="dynamic-phase-text" class="tide-title-sub">জলস্তর লোড হচ্ছে...</div> 
+        </div>
+    </div>
+
+    <div class="tide-body-flex">
+        <div id="tide-list-container" class="tide-list-container">
+            <div id="loading-message" style="color: #ffeb3b; text-align: center; padding: 20px;">
+                জোয়ার-ভাটার তথ্য লোড হচ্ছে...
+            </div>
+        </div>
+
+        <div class="level-indicator-wrapper">
+            <div id="level-container" class="level-container">
+                <div id="level-bar" class="level-bar"></div>
+                <div id="level-percent" class="level-percent"></div> 
+            </div>
+        </div>
+    </div>
+
+    <div class="widget-footer">
+        আজ: <strong id="current-date-display"></strong> | 
+        স্থান: <strong id="location-name">Kolakata</strong> |
+        স্থানীয় সময়: <strong id="local-time-display"></strong>
+        
+        <div id="api-key-warning" style="display: none; color: #ffeb3b; font-size: 0.8em; margin-top: 5px; padding-top: 5px; border-top: 1px solid rgba(255, 255, 255, 0.2); font-weight: bold;">
+             জোয়ার-ভাটার তথ্য লোড হচ্ছে না (ফলব্যাক ডেটা ব্যবহৃত হচ্ছে)
+        </div>
+    </div>
+</div>
 
 <style>
-    body {
-        margin: 0;
-        padding: 0;
-        background: #00575e;
-        font-family: sans-serif;
-        color: white;
-    }
-    #madhabam-tide-widget {
-        max-width: 360px;
-        margin: 0 auto;
-        padding: 10px;
-    }
+/* ---------------------------------
+   CSS (No Change)
+   --------------------------------- */
+.tide-widget {
+    background-color: #2e5c6a; 
+    border: 5px solid #795548; 
+    border-radius: 12px;
+    padding: 15px;
+    max-width: 300px; 
+    color: #ffffff;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    margin: 10px auto; 
+    font-family: Arial, sans-serif; 
+}
+
+.widget-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end; 
+    margin-bottom: 10px;
+    gap: 10px;
+}
+
+.tide-title {
+    color: #ffeb3b; 
+    font-size: 1.3em;
+    font-weight: bold;
+    flex-grow: 1;
+    text-align: left;
+}
+
+.level-title-flex {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+#dynamic-phase-text { 
+    color: #cfd8dc; 
+    font-size: 0.9em;
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+.tide-body-flex {
+    display: flex;
+    gap: 15px;
+    align-items: stretch;
+    min-height: 200px; 
+    margin-bottom: 10px;
+}
+
+.tide-list-container {
+    flex-grow: 1; 
+}
+
+.level-indicator-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.tide-entry {
+    display: flex;
+    justify-content: space-between; 
+    align-items: center;
+    padding: 8px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    transition: background-color 0.3s ease;
+    white-space: nowrap; 
+    overflow: hidden;
+}
+
+.tide-info {
+    font-size: 1.0em; 
+    color: #cfd8dc; 
+    flex-shrink: 0; 
+    display: flex;
+    align-items: center;
+}
+
+.tide-info.low-magnitude {
+    color: #81d4fa; 
+}
+
+
+.tide-time {
+    font-size: 1.1em;
+    font-weight: bold;
+    color: #ffd700;
+    margin-left: 10px; 
+}
+
+.tide-entry-current {
+    background-color: rgba(255, 255, 255, 0.15); 
+    border-radius: 4px;
+    padding-left: 5px;
+    padding-right: 5px;
+    margin: 2px 0;
+}
+
+.wave-icon {
+    margin-right: 8px;
+    font-size: 1.1em;
+    color: #81d4fa; 
+}
+
+.indicator-arrow {
+    font-size: 1.2em;
+    margin-left: 5px;
+    line-height: 1; 
+}
+
+.level-container {
+    width: 28px; 
+    height: 100%; 
+    background-color: #4a7582;
+    border-radius: 14px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.level-bar {
+    width: 100%;
+    background: linear-gradient(to top, #03a9f4, #81d4fa); 
+    position: absolute;
+    bottom: 0;
+    height: 0%; 
+    transition: height 1s ease-in-out;
+}
+
+.level-percent {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-90deg);
+    color: #fff; 
+    font-size: 0.9em;
+    font-weight: bold;
+    width: 100px;
+    text-align: center;
+    text-shadow: 0 0 3px rgba(0, 0, 0, 0.5); 
+}
+
+.widget-footer {
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    padding-top: 10px;
+    margin-top: 10px;
+    font-size: 0.85em;
+    color: #cfd8dc;
+    text-align: center;
+}
+
+.widget-footer strong {
+    color: #ffeb3b;
+}
+
+.bengali-number {
+    font-family: 'Noto Sans Bengali', sans-serif; 
+}
 </style>
-</head>
-
-<body>
-
-<div id="madhabam-tide-widget" style="max-width:300px;"></div>
 
 <script>
-/* তোমার সম্পূর্ণ কোড — কোনো লাইন পরিবর্তন হয়নি */
-(function(){
-    const API_OM = 'https://api.open-meteo.com/v1/forecast';
-    const API_IP = 'https://ipapi.co/json/';
-    const DEFAULT = { lat:22.57, lng:88.36, source:'স্থির স্থানাঙ্ক', city:'কলকাতা' };
-    const $ = id => document.getElementById(id);
+// ---------------------------------
+// JavaScript (Final and Dynamic Fixes)
+// ---------------------------------
 
-    const FALLBACK_DATA = { tide_anchor_fallback:'20:30' };
+const STATE = {
+    lat: 22.5726, // Kolkata
+    lng: 88.3639, // Kolkata
+    city: "Kolakata",
+    tides: [], // Holds API or Cached data
+    level: 50,
+    isApiWorking: true,
+    levelChangeText: 'জলস্তর স্থিতিশীল',
+    moonPhaseFactor: 1.0 
+};
 
-    let STATE = { lat:DEFAULT.lat, lng:DEFAULT.lng, source:DEFAULT.source, city:DEFAULT.city, tides:[] };
-    let updateUIInterval = null;
-    let updateDataInterval = null;
+const TIDE_API_PRIMARY = `https://tide.dynv6.net/api/tide?lat=${STATE.lat}&lng=${STATE.lng}`;
+const MOON_API = `https://api.open-meteo.com/v1/forecast?latitude=${STATE.lat}&longitude=${STATE.lng}&daily=moon_phase&timezone=auto`;
 
-    function formatToBengali(dateInput, isTime=false, showSeconds=false){
-        if(!dateInput) return '—';
-        try{
-            const date = (dateInput instanceof Date)?dateInput:new Date(dateInput);
-            if(isNaN(date)) return '—';
-            const opt={ timeZone:'Asia/Kolkata' };
-            if(isTime){
-                opt.hour='2-digit'; opt.minute='2-digit';
-                if(showSeconds) opt.second='2-digit';
-                opt.hour12=true;
-                return date.toLocaleTimeString('bn-BD',opt);
+const CACHE_KEY = 'tideWidgetData';
+const DATA_REFRESH_MS = 30 * 60 * 1000; // 30 minutes
+
+let updateUIInterval; 
+let updateDataInterval; 
+
+// --- Utility Functions ---
+function getBengaliTime(date) {
+    const options = { hour: '2-digit', minute: '2-digit', hour12: true };
+    return new Date(date).toLocaleString('bn-IN', options)
+        .replace(/AM/, ' AM').replace(/PM/, ' PM');
+}
+
+function getBengaliDate(date) {
+    const d = new Date(date);
+    const options = { day: '2-digit', month: '2-digit', year: 'numeric' };
+    return d.toLocaleString('bn-IN', options).replace(/\//g, '-');
+}
+
+function toBengaliNumber(num) {
+    const map = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+    return String(num).split('').map(char => map[parseInt(char)] || char).join('');
+}
+
+// --- Caching Logic (No Change) ---
+function getCachedData() {
+    try {
+        const cachedData = localStorage.getItem(CACHE_KEY);
+        if (!cachedData) return null;
+
+        const data = JSON.parse(cachedData);
+        if (data.timestamp && data.timestamp > new Date().getTime() - DATA_REFRESH_MS) {
+            return data.tides;
+        }
+        return null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function setCachedData(tides) {
+    try {
+        const expiryTimestamp = new Date().getTime() + DATA_REFRESH_MS;
+        const data = {
+            timestamp: expiryTimestamp,
+            tides: tides
+        };
+        localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+    } catch (e) {
+        console.error("Error setting cached data:", e);
+    }
+}
+
+// --- ULTIMATE FALLBACK DATA (Essential for Dynamic Level when API fails) ---
+function getLocalFallbackTides() {
+    const now = new Date();
+    const avgTideCycleDurationMs = 6 * 60 * 60 * 1000 + 12.5 * 60 * 1000;
+    
+    let baseTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 1, 0, 0).getTime(); 
+
+    while (baseTime < now.getTime() - avgTideCycleDurationMs) {
+        baseTime += avgTideCycleDurationMs * 2; 
+    }
+    while (baseTime > now.getTime() + avgTideCycleDurationMs) {
+        baseTime -= avgTideCycleDurationMs * 2; 
+    }
+    
+    const tides = [];
+    let currentTime = baseTime - (2 * avgTideCycleDurationMs);
+    
+    for (let i = 0; i < 6; i++) { 
+        let type = i % 2 === 0 ? 'High' : 'Low';
+        
+        if(i > 0) {
+            currentTime += avgTideCycleDurationMs;
+        }
+        
+        tides.push({ time: new Date(currentTime).toISOString(), type: type });
+    }
+    
+    return tides.filter(tide => new Date(tide.time) > new Date().getTime() - (6 * 60 * 60 * 1000)).slice(0, 6);
+}
+
+// --- Moon Phase Calculation (No Change) ---
+async function fetchMoonPhase() {
+    try {
+        const response = await fetch(MOON_API);
+        if (!response.ok) throw new Error('Moon API failed');
+        const data = await response.json();
+        const moonCode = data.daily.moon_phase[0]; 
+        
+        let factor = 1.0;
+        if (moonCode <= 1 || moonCode >= 23 || (moonCode >= 11 && moonCode <= 13)) {
+            factor = 1.3; 
+        } else if ((moonCode >= 5 && moonCode <= 7) || (moonCode >= 17 && moonCode <= 19)) {
+            factor = 0.7; 
+        }
+        STATE.moonPhaseFactor = factor;
+    } catch (e) {
+        STATE.moonPhaseFactor = 1.0; 
+    }
+}
+
+// --- UI Building Functions (No Logic Change) ---
+function buildTideList(tides) {
+    const dataTides = (tides && tides.length > 0) ? tides : getLocalFallbackTides(); 
+    
+    let html = '';
+    const now = new Date();
+    let isCurrentTideFound = false;
+    let highCount = 0; 
+    let lowCount = 0;  
+    const waterIcon = '<span class="wave-icon">≈</span>'; 
+
+    const displayTides = dataTides.slice(0, 6); 
+
+    displayTides.forEach((tide) => {
+        const tideTime = new Date(tide.time);
+        const timeStr = getBengaliTime(tide.time);
+        
+        let typeStr;
+        let magnitudeClass = ''; 
+        let arrowIcon = ''; 
+        
+        if (tide.type.toLowerCase() === 'high') {
+            if (highCount % 2 === 0) {
+                typeStr = 'উচ্চ জোয়ার'; 
+            } else {
+                typeStr = 'নিম্ন জোয়ার'; 
+                magnitudeClass = 'low-magnitude'; 
             }
-            opt.day='2-digit'; opt.month='2-digit'; opt.year='numeric';
-            return date.toLocaleDateString('bn-BD',opt).replace(/\//g,'-');
-        }catch(e){ return '—'; }
-    }
+            arrowIcon = '<span class="indicator-arrow arrow-up">▲</span>'; 
+            highCount++;
+        } else {
+            if (lowCount % 2 === 0) {
+                typeStr = 'নিম্ন ভাটা'; 
+            } else {
+                typeStr = 'উচ্চ ভাটা'; 
+                magnitudeClass = 'low-magnitude'; 
+            }
+            arrowIcon = '<span class="indicator-arrow arrow-down">▼</span>';
+            lowCount++;
+        }
 
-    function parseBengaliTime(timeStr,dateContext){
-        try{
-            const parts=timeStr.split(' ');
-            if(parts.length!==2) return null;
-            const [timePart,ampm]=parts;
-            let [h,m]=timePart.split(':').map(Number);
-            if(ampm==='PM'&&h!==12) h+=12;
-            if(ampm==='AM'&&h===12) h=0;
-            let d=dateContext||new Date();
-            d.setHours(h,m,0,0);
-            return d;
-        }catch(e){ return null; }
-    }
+        let isCurrent = !isCurrentTideFound && tideTime > now;
+        if (isCurrent) {
+            isCurrentTideFound = true;
+        }
 
-    function createWaveSVG(){
-        const ns='http://www.w3.org/2000/svg';
-        const svg=document.createElementNS(ns,'svg');
-        svg.setAttribute('width','24'); svg.setAttribute('height','24'); svg.setAttribute('viewBox','0 0 24 24');
-        const style=document.createElementNS(ns,'style');
-        style.textContent=`
-            .wave{fill:none;stroke:#FFF;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;animation:wave-motion 2s linear infinite alternate;}
-            @keyframes wave-motion{0%{transform:translateY(0px);}100%{transform:translateY(-2px);}}
+        const currentArrow = isCurrent ? arrowIcon : ''; 
+        
+        html += `
+            <div class="tide-entry ${isCurrent ? 'tide-entry-current' : ''}">
+                <div class="tide-info ${magnitudeClass}">
+                    ${waterIcon} ${typeStr}
+                </div>
+                <div class="tide-time bengali-number">
+                    ${timeStr} ${currentArrow}
+                </div>
+            </div>
         `;
-        svg.appendChild(style);
-        const p1=document.createElementNS(ns,'path'); p1.setAttribute('class','wave'); p1.setAttribute('d','M2 12s2-2 4-2 4 2 4 2 2-2 4-2 4 2 4 2'); svg.appendChild(p1);
-        const p2=document.createElementNS(ns,'path'); p2.setAttribute('class','wave'); p2.setAttribute('d','M2 16s2-2 4-2 4 2 4 2 2-2 4-2 4 2 4 2'); p2.style.animationDelay='-1s'; svg.appendChild(p2);
-        return svg.outerHTML;
+    });
+    
+    return html; 
+}
+
+function updateLevelUI(currentLevel) {
+    const levelBar = document.getElementById('level-bar');
+    const levelPercent = document.getElementById('level-percent');
+
+    if (levelBar && levelPercent) {
+        const percentage = Math.max(0, Math.min(100, Math.round(currentLevel)));
+        levelBar.style.height = `${percentage}%`;
+        levelPercent.textContent = `${toBengaliNumber(percentage)}%`;
     }
+}
 
-    function createGlowArrow(direction,size='1.1em'){
-        const arrow=direction==='up'?'▲':'▼';
-        const color=direction==='up'?'#32CD32':'#FF4500';
-        const shadow=`0 0 5px ${color},0 0 10px ${color}`;
-        return `<span style="font-size:${size};color:${color};text-shadow:${shadow};margin-left:5px;position:relative;top:${direction==='up'?'-2px':'2px'};">${arrow}</span>`;
-    }
-
-    function approxTides(baseTime){
-        let base=new Date();
-        if(baseTime && baseTime.includes('T')) base=new Date(baseTime);
-        else if(baseTime){
-            const d=new Date();
-            const [h,m]=baseTime.split(':').map(Number);
-            base=new Date(d.getFullYear(),d.getMonth(),d.getDate(),h,m,0);
+// FIX: Water Level Calculation (Ensure Dynamic Level even with no API data)
+function updateLevelAndPhase(tides) {
+    const now = new Date().getTime();
+    
+    // ENSURE dynamic calculation data: Use API/Cached data first, otherwise use fresh Fallback data
+    const effectiveTides = (tides && tides.length > 0) ? tides : getLocalFallbackTides(); 
+    
+    let lastTide = null;
+    let nextTide = null;
+    
+    if (effectiveTides.length > 1) { 
+        
+        // Find the event pair that brackets the current time
+        for (let i = 0; i < effectiveTides.length; i++) {
+            const tideTime = new Date(effectiveTides[i].time).getTime();
+            if (tideTime < now) {
+                lastTide = effectiveTides[i];
+            } else {
+                nextTide = effectiveTides[i];
+                break;
+            }
         }
-        const gap=(6*60+12)*60000;
-        const out=[];
-        const types=['উচ্চ জোয়ার','নিম্ন ভাটা','উচ্চ জোয়ার','নিম্ন ভাটা'];
-        for(let i=0;i<4;i++){
-            let t=new Date(base.getTime()+i*gap);
-            out.push({ type:types[i], time:formatToBengali(t,true), level:(i%2===0)?'high':'low', timestamp:t.getTime() });
-        }
-        return out.sort((a,b)=>a.timestamp-b.timestamp);
-    }
-
-    function getDynamicLevelInfo(tides){
-        if(!tides||!tides.length) return {level:50,direction:'static',nextEventIndex:-1};
-        const now=Date.now();
-        let past=null,next=null,index=-1;
-
-        for(let i=0;i<tides.length;i++){
-            if(tides[i].timestamp<=now){ past=tides[i]; next=tides[i+1]; index=i+1; }
-            else if(!next){ next=tides[i]; index=i; }
-        }
-
-        if(!next){
-            next=tides[0];
-            past=tides[tides.length-1];
-            index=0;
-        }
-
-        const start=past&&past.level==='high'?95:5;
-        const end=next&&next.level==='high'?95:5;
-
-        let lvl=50;
-        let dir='static';
-
-        if(past && next && next.timestamp>past.timestamp){
-            const total=next.timestamp-past.timestamp;
-            const done=now-past.timestamp;
-            lvl=start + ((end-start)*(done/total));
-            dir=end>start?'up':'down';
+        
+        // Final check to prevent static level if array ran out
+        if (!nextTide && lastTide) {
+            const freshFallback = getLocalFallbackTides();
+            if (freshFallback.length >= 2) {
+                lastTide = freshFallback[0];
+                nextTide = freshFallback[1];
+            }
         }
 
-        lvl=Math.max(5,Math.min(95,lvl));
-        return { level:Math.round(lvl), direction:dir, nextEventIndex:index };
-    }
 
-    function loadCoordinates(){
-        return fetch(API_IP).then(r=>r.json()).then(j=>{
-            return{
-                lat:j.latitude||DEFAULT.lat,
-                lng:j.longitude||DEFAULT.lng,
-                source:'IP API',
-                city:j.city||DEFAULT.city
-            };
-        }).catch(_=>DEFAULT);
-    }
+        if (lastTide && nextTide) {
+            const lastTime = new Date(lastTide.time).getTime();
+            const nextTime = new Date(nextTide.time).getTime();
+            const duration = nextTime - lastTime;
+            const elapsed = now - lastTime;
+            let ratio = elapsed / duration;
+            
+            if (ratio > 1) ratio = 1;
+            if (ratio < 0) ratio = 0;
 
-    function buildTideList(tides,info){
-        let html='';
-        tides.forEach((t,i)=>{
-            const hi=i===info.nextEventIndex;
-            const ar=hi?createGlowArrow(info.direction,'0.9em'):'';
-            html+=`
-            <div class="tide-item-compact ${hi?'highlight':''}">
-                <span class="tide-label-group">
-                    <div class="tide-icon-svg">${createWaveSVG()}</div>
-                    <div class="tide-text-stack">
-                        <span class="tide-type-value">${t.type}${ar}</span>
-                        <span class="tide-time-value">${t.time}</span>
-                    </div>
-                </span>
-            </div>`;
-        });
-        return html;
-    }
+            let levelPercent;
+            
+            // Low to High (Rising Tide)
+            if (lastTide.type.toLowerCase() === 'low' && nextTide.type.toLowerCase() === 'high') {
+                levelPercent = 50 * (1 - Math.cos(ratio * Math.PI)) + 50; 
+                STATE.levelChangeText = 'উচ্চ জোয়ারের দিকে'; 
+            } 
+            // High to Low (Falling Tide)
+            else if (lastTide.type.toLowerCase() === 'high' && nextTide.type.toLowerCase() === 'low') {
+                levelPercent = 50 * (1 + Math.cos(ratio * Math.PI)); 
+                STATE.levelChangeText = 'নিম্ন ভাটার দিকে'; 
+            } else {
+                levelPercent = lastTide.type.toLowerCase() === 'high' ? 98 : 2;
+                STATE.levelChangeText = 'জলস্তর স্থিতিশীল';
+            }
+            
+            // Apply Moon Phase Factor for range scaling
+            const baseFactor = 1.1; 
+            const finalFactor = baseFactor * STATE.moonPhaseFactor; 
+            
+            let normalizedLevel = levelPercent / 100;
+            let factoredLevel = (normalizedLevel - 0.5) * 2 * finalFactor; 
+            
+            STATE.level = Math.max(0, Math.min(100, (factoredLevel / 2 + 0.5) * 100)); 
 
-    function updateLiveUI(){
-        if(!STATE.tides.length) return;
-        $('local-time-live').textContent=formatToBengali(new Date(),true,true);
-        const {level,direction}=getDynamicLevelInfo(STATE.tides);
-        $('water-fill').style.height=level+"%";
-        $('water-level-text').textContent=level+"%";
-        $('tide-events-list').innerHTML=buildTideList(STATE.tides,getDynamicLevelInfo(STATE.tides));
-        $('panel-arrow-indicator').innerHTML=direction!=='static'?createGlowArrow(direction,'1.4em'):'';
-    }
-
-    function buildWidget(data){
-        const cur=formatToBengali(new Date(),false);
-        const dyn=getDynamicLevelInfo(data.tides);
-        const arrow=dyn.direction!=='static'?createGlowArrow(dyn.direction,'1.4em'):'';
-
-        return `
-        <style>
-        ${document.querySelector("style").innerHTML}
-        </style>
-
-        <div class="tide-panel">
-            <div class="tide-content">
-                <div class="tide-header-section">
-                    <div class="tide-header-title">জোয়ার-ভাটা</div>
-                    <div style="text-align:right;font-size:0.7em;">
-                        <span id="panel-arrow-indicator">${arrow}</span><br>বর্তমান জলস্তর
-                    </div>
-                </div>
-                <div class="tide-events-list" id="tide-events-list">${buildTideList(data.tides,dyn)}</div>
-                <div class="footer-tags-section">
-                    <div class="tide-date-footer">আজ: ${cur}</div>
-                    <div class="location-time-tag">
-                        স্থান: <span>${data.city}</span> | সময়:
-                        <span id="local-time-live">${formatToBengali(new Date(),true,true)}</span>
-                    </div>
-                </div>
-            </div>
-            <div class="level-indicator-container">
-                <div class="level-indicator-bar">
-                    <div id="water-level-text" class="water-level-text">${dyn.level}%</div>
-                    <div id="water-fill" class="water-fill" style="height:${dyn.level}%"></div>
-                </div>
-            </div>
-        </div>`;
-    }
-
-    async function loadAllData(){
-        const coords=await loadCoordinates();
-        STATE.lat=coords.lat; STATE.lng=coords.lng; STATE.city=coords.city;
-
-        let moon=null;
-        try{
-            const r=await fetch(API_OM+`?latitude=${STATE.lat}&longitude=${STATE.lng}&daily=moonrise&timezone=auto`);
-            const j=await r.json();
-            moon=(j.daily&&j.daily.moonrise&&j.daily.moonrise[0])?j.daily.moonrise[0]:FALLBACK_DATA.tide_anchor_fallback;
-        }catch(e){
-            moon=FALLBACK_DATA.tide_anchor_fallback;
+        } else {
+             // Fallback to initial 50% only if data is insufficient for calculation
+             STATE.level = 50;
+             STATE.levelChangeText = 'জলস্তর স্থিতিশীল';
         }
-
-        STATE.tides=approxTides(moon);
-
-        $('madhabam-tide-widget').innerHTML=buildWidget(STATE);
-
-        updateUIInterval=setInterval(updateLiveUI,100);
-        updateDataInterval=setInterval(loadAllData,1800000);
+    } else {
+         STATE.level = 50;
+         STATE.levelChangeText = 'জলস্তর স্থিতিশীল';
     }
 
-    loadAllData();
-})();
+    updateLevelUI(STATE.level);
+}
+
+
+function buildWidget(state) {
+    const tideListContainer = document.getElementById('tide-list-container');
+    const dateDisplay = document.getElementById('current-date-display');
+    const timeDisplay = document.getElementById('local-time-display');
+    const locationName = document.getElementById('location-name');
+    const warningDiv = document.getElementById('api-key-warning');
+    const dynamicPhaseText = document.getElementById('dynamic-phase-text');
+    
+    const loadingMessage = document.getElementById('loading-message');
+    if(loadingMessage) loadingMessage.style.display = 'none';
+
+    if (tideListContainer) {
+        tideListContainer.innerHTML = buildTideList(state.tides);
+    } 
+    
+    if (dynamicPhaseText) {
+        let changeIcon = '';
+        if (state.levelChangeText.includes('জোয়ারের দিকে')) {
+            changeIcon = '<span style="color: #69f0ae;">▲</span>'; 
+        } else if (state.levelChangeText.includes('ভাটার দিকে')) {
+            changeIcon = '<span style="color: #ff8a80;">▼</span>';
+        } else {
+             changeIcon = '<span style="color: #81d4fa;">💧</span>';
+        }
+        dynamicPhaseText.innerHTML = `${changeIcon} ${state.levelChangeText}`;
+    }
+    
+    if (dateDisplay) dateDisplay.textContent = getBengaliDate(new Date());
+    if (timeDisplay) timeDisplay.textContent = getBengaliTime(new Date());
+    if (locationName) locationName.textContent = state.city;
+    
+    // Warning Message Logic
+    if (state.tides.length === 0) {
+        warningDiv.style.display = 'block';
+    } else {
+        warningDiv.style.display = 'none';
+    }
+}
+
+
+// --- Data Fetching Logic ---
+async function loadAllData() {
+    let apiSuccess = false;
+    
+    await fetchMoonPhase();
+
+    // 1. Try fetching fresh data from the Primary API
+    try {
+        const tideResponse = await fetch(TIDE_API_PRIMARY);
+        if (!tideResponse.ok) throw new Error('Primary API call failed');
+        const tideData = await tideResponse.json();
+        const freshTides = tideData.tides || [];
+        
+        if (freshTides.length > 0) {
+            STATE.tides = freshTides; 
+            setCachedData(freshTides); 
+            apiSuccess = true;
+        } else {
+             throw new Error('API returned no tide data.');
+        }
+    } catch (e) {
+        console.warn("Fresh data fetch failed. Trying cache/fallback.");
+    }
+    
+    // 2. If API failed, try Cache
+    if (!apiSuccess) {
+        const cachedTides = getCachedData();
+        if (cachedTides) {
+            STATE.tides = cachedTides;
+        } else {
+             // 3. If Cache failed, use Fallback (STATE.tides remains [])
+             STATE.tides = [];
+        }
+    }
+    
+    // IMPORTANT: Level calculation MUST happen on every data load
+    updateLevelAndPhase(STATE.tides);
+    buildWidget(STATE);
+}
+
+// FIX: UI update function, robust clock and dynamic level check
+function updateUI() {
+    const timeDisplay = document.getElementById('local-time-display');
+    // Ensure clock is updated frequently
+    if (timeDisplay) timeDisplay.textContent = getBengaliTime(new Date()); 
+
+    // Re-calculate level and phase based on data (this is the key to dynamic level)
+    // If STATE.tides is [], updateLevelAndPhase will automatically use fresh getLocalFallbackTides()
+    updateLevelAndPhase(STATE.tides); 
+    
+    buildWidget(STATE);
+}
+
+function initializeWidget() {
+    // Clear any existing intervals before starting new ones
+    if (updateUIInterval) clearInterval(updateUIInterval);
+    if (updateDataInterval) clearInterval(updateDataInterval);
+    
+    loadAllData(); // Initial data load
+    
+    // UI update every 5 seconds (for smooth clock and dynamic level)
+    updateUIInterval = setInterval(updateUI, 5000); 
+    // Data reload every 30 minutes (to check if API is back online)
+    updateDataInterval = setInterval(loadAllData, 1800000); 
+}
+
+window.onload = initializeWidget; 
 </script>
-
-</body>
-</html>
