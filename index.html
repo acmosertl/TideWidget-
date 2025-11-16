@@ -33,38 +33,37 @@
 </div>
 
 <style>
-
 /* ---------------------------------
-   CSS (FINAL - For 225px width)
+   CSS (FINAL - OPTIMIZED FOR 220px WIDTH)
    --------------------------------- */
 .tide-widget {
     background-color: #2e5c6a; 
-    border: 3px solid #795548; /* Border reduced */
+    border: 3px solid #795548; 
     border-radius: 10px;
-    padding: 8px; /* Padding reduced significantly */
+    padding: 8px; /* Reduced for narrow width */
     max-width: 220px; /* Crucial: To fit within 225px iframe */
     color: #ffffff;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
     margin: 5px auto; 
     font-family: Arial, sans-serif; 
-    font-size: 0.95em; /* Base font size reduced */
+    font-size: 0.95em; 
 }
 
 .widget-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-end; 
-    margin-bottom: 5px; /* Margin reduced */
+    margin-bottom: 5px; 
     gap: 5px;
 }
 
 .tide-title {
     color: #ffeb3b; 
-    font-size: 1.1em; /* Title font reduced */
+    font-size: 1.1em; 
     font-weight: bold;
     flex-grow: 1;
     text-align: left;
-    white-space: nowrap; /* Prevent wrap */
+    white-space: nowrap; 
 }
 
 .level-title-flex {
@@ -75,16 +74,16 @@
 
 #dynamic-phase-text { 
     color: #cfd8dc; 
-    font-size: 0.8em; /* Subtitle font reduced */
+    font-size: 0.8em; 
     font-weight: bold;
     white-space: nowrap;
 }
 
 .tide-body-flex {
     display: flex;
-    gap: 10px; /* Gap reduced */
+    gap: 10px; 
     align-items: stretch;
-    min-height: 180px; /* Min-height reduced */
+    min-height: 180px; 
     margin-bottom: 5px;
 }
 
@@ -102,69 +101,106 @@
     display: flex;
     justify-content: space-between; 
     align-items: center;
-    padding: 5px 0; /* Entry padding reduced */
+    padding: 5px 0; 
     border-top: 1px solid rgba(255, 255, 255, 0.1);
     white-space: nowrap; 
     overflow: hidden;
 }
 
 .tide-info {
-    font-size: 0.9em; /* Tide info font reduced */
+    font-size: 0.9em; 
     color: #cfd8dc; 
     flex-shrink: 0; 
     display: flex;
     align-items: center;
 }
 
+.tide-info.low-magnitude {
+    color: #81d4fa; 
+}
+
+
 .tide-time {
-    font-size: 1.0em; /* Time font reduced */
+    font-size: 1.0em; 
     font-weight: bold;
     color: #ffd700;
-    margin-left: 5px; /* Margin reduced */
+    margin-left: 5px; 
+}
+
+.tide-entry-current {
+    background-color: rgba(255, 255, 255, 0.15); 
+    border-radius: 4px;
+    padding-left: 5px;
+    padding-right: 5px;
+    margin: 2px 0;
 }
 
 .wave-icon {
     margin-right: 5px;
     font-size: 1.0em;
+    color: #81d4fa; 
 }
 
 .indicator-arrow {
     font-size: 1.0em;
     margin-left: 3px;
+    line-height: 1; 
 }
 
 .level-container {
-    width: 20px; /* Indicator width reduced */
+    width: 20px; 
     height: 100%; 
     background-color: #4a7582;
     border-radius: 10px;
+    overflow: hidden;
     position: relative;
+    box-shadow: inset 0 0 3px rgba(0, 0, 0, 0.2);
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+.level-bar {
+    width: 100%;
+    background: linear-gradient(to top, #03a9f4, #81d4fa); 
+    position: absolute;
+    bottom: 0;
+    height: 0%; 
+    transition: height 1s ease-in-out;
+}
+
 .level-percent {
-    /* Centering logic remains */
-    font-size: 0.75em; /* Percentage font reduced */
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-90deg);
+    color: #fff; 
+    font-size: 0.75em; 
+    font-weight: bold;
     width: 80px;
+    text-align: center;
+    text-shadow: 0 0 3px rgba(0, 0, 0, 0.5); 
 }
 
 .widget-footer {
     border-top: 1px solid rgba(255, 255, 255, 0.2);
     padding-top: 5px;
     margin-top: 5px;
-    font-size: 0.75em; /* Footer font reduced */
+    font-size: 0.75em; 
     color: #cfd8dc;
     text-align: center;
 }
-</style>
 
+.widget-footer strong {
+    color: #ffeb3b;
+}
 
-    
+.bengali-number {
+    font-family: 'Noto Sans Bengali', sans-serif; 
+}
 </style>
 
 <script>
 // ---------------------------------
-// JavaScript (Final and Dynamic Fixes)
+// JavaScript (FINAL - ROBUST DYNAMIC LEVEL & CLOCK)
 // ---------------------------------
 
 const STATE = {
@@ -205,7 +241,7 @@ function toBengaliNumber(num) {
     return String(num).split('').map(char => map[parseInt(char)] || char).join('');
 }
 
-// --- Caching Logic (No Change) ---
+// --- Caching Logic ---
 function getCachedData() {
     try {
         const cachedData = localStorage.getItem(CACHE_KEY);
@@ -237,10 +273,13 @@ function setCachedData(tides) {
 // --- ULTIMATE FALLBACK DATA (Essential for Dynamic Level when API fails) ---
 function getLocalFallbackTides() {
     const now = new Date();
+    // Avg tide cycle duration is 6 hours 12.5 minutes
     const avgTideCycleDurationMs = 6 * 60 * 60 * 1000 + 12.5 * 60 * 1000;
     
+    // Set a base time (e.g., 1 AM today)
     let baseTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 1, 0, 0).getTime(); 
 
+    // Find the closest past High Tide event near 'now' (ensures calculation is recent)
     while (baseTime < now.getTime() - avgTideCycleDurationMs) {
         baseTime += avgTideCycleDurationMs * 2; 
     }
@@ -248,10 +287,12 @@ function getLocalFallbackTides() {
         baseTime -= avgTideCycleDurationMs * 2; 
     }
     
+    // Generate events starting from 2 cycles before the found baseTime
     const tides = [];
     let currentTime = baseTime - (2 * avgTideCycleDurationMs);
     
     for (let i = 0; i < 6; i++) { 
+        // Alternate between High and Low
         let type = i % 2 === 0 ? 'High' : 'Low';
         
         if(i > 0) {
@@ -261,10 +302,11 @@ function getLocalFallbackTides() {
         tides.push({ time: new Date(currentTime).toISOString(), type: type });
     }
     
+    // Filter to get only relevant recent/future tides for display/calculation
     return tides.filter(tide => new Date(tide.time) > new Date().getTime() - (6 * 60 * 60 * 1000)).slice(0, 6);
 }
 
-// --- Moon Phase Calculation (No Change) ---
+// --- Moon Phase Calculation ---
 async function fetchMoonPhase() {
     try {
         const response = await fetch(MOON_API);
@@ -273,19 +315,24 @@ async function fetchMoonPhase() {
         const moonCode = data.daily.moon_phase[0]; 
         
         let factor = 1.0;
+        // Increase range for New Moon (0) and Full Moon (12-13)
         if (moonCode <= 1 || moonCode >= 23 || (moonCode >= 11 && moonCode <= 13)) {
             factor = 1.3; 
-        } else if ((moonCode >= 5 && moonCode <= 7) || (moonCode >= 17 && moonCode <= 19)) {
+        } 
+        // Decrease range for Quarter Moons (5-7 and 17-19)
+        else if ((moonCode >= 5 && moonCode <= 7) || (moonCode >= 17 && moonCode <= 19)) {
             factor = 0.7; 
         }
         STATE.moonPhaseFactor = factor;
     } catch (e) {
+        // Fallback if Moon API fails
         STATE.moonPhaseFactor = 1.0; 
     }
 }
 
-// --- UI Building Functions (No Logic Change) ---
+// --- UI Building Functions ---
 function buildTideList(tides) {
+    // ENSURE dynamic calculation data: Use API/Cached data first, otherwise use fresh Fallback data
     const dataTides = (tides && tides.length > 0) ? tides : getLocalFallbackTides(); 
     
     let html = '';
@@ -358,11 +405,11 @@ function updateLevelUI(currentLevel) {
     }
 }
 
-// FIX: Water Level Calculation (Ensure Dynamic Level even with no API data)
+// Water Level Calculation (Handles API failure gracefully)
 function updateLevelAndPhase(tides) {
     const now = new Date().getTime();
     
-    // ENSURE dynamic calculation data: Use API/Cached data first, otherwise use fresh Fallback data
+    // Use API/Cached data first, otherwise use fresh Fallback data
     const effectiveTides = (tides && tides.length > 0) ? tides : getLocalFallbackTides(); 
     
     let lastTide = null;
@@ -381,7 +428,7 @@ function updateLevelAndPhase(tides) {
             }
         }
         
-        // Final check to prevent static level if array ran out
+        // Safety check if we ran out of events
         if (!nextTide && lastTide) {
             const freshFallback = getLocalFallbackTides();
             if (freshFallback.length >= 2) {
@@ -427,7 +474,7 @@ function updateLevelAndPhase(tides) {
             STATE.level = Math.max(0, Math.min(100, (factoredLevel / 2 + 0.5) * 100)); 
 
         } else {
-             // Fallback to initial 50% only if data is insufficient for calculation
+             // Fallback to 50% only if data is insufficient for calculation
              STATE.level = 50;
              STATE.levelChangeText = 'জলস্তর স্থিতিশীল';
         }
@@ -471,7 +518,7 @@ function buildWidget(state) {
     if (timeDisplay) timeDisplay.textContent = getBengaliTime(new Date());
     if (locationName) locationName.textContent = state.city;
     
-    // Warning Message Logic
+    // Warning Message Logic: Only show warning if API/Cache data is empty
     if (state.tides.length === 0) {
         warningDiv.style.display = 'block';
     } else {
@@ -480,7 +527,7 @@ function buildWidget(state) {
 }
 
 
-// --- Data Fetching Logic ---
+// --- Data Fetching Logic (Triple Fallback) ---
 async function loadAllData() {
     let apiSuccess = false;
     
@@ -520,14 +567,13 @@ async function loadAllData() {
     buildWidget(STATE);
 }
 
-// FIX: UI update function, robust clock and dynamic level check
+// UI update function (robust clock and dynamic level check)
 function updateUI() {
     const timeDisplay = document.getElementById('local-time-display');
     // Ensure clock is updated frequently
     if (timeDisplay) timeDisplay.textContent = getBengaliTime(new Date()); 
 
-    // Re-calculate level and phase based on data (this is the key to dynamic level)
-    // If STATE.tides is [], updateLevelAndPhase will automatically use fresh getLocalFallbackTides()
+    // Re-calculate level and phase based on data (ensures dynamic level)
     updateLevelAndPhase(STATE.tides); 
     
     buildWidget(STATE);
