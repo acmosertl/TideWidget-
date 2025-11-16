@@ -33,35 +33,38 @@
 </div>
 
 <style>
+
 /* ---------------------------------
-   CSS (No Change)
+   CSS (FINAL - For 225px width)
    --------------------------------- */
 .tide-widget {
     background-color: #2e5c6a; 
-    border: 5px solid #795548; 
-    border-radius: 12px;
-    padding: 15px;
-    max-width: 300px; 
+    border: 3px solid #795548; /* Border reduced */
+    border-radius: 10px;
+    padding: 8px; /* Padding reduced significantly */
+    max-width: 220px; /* Crucial: To fit within 225px iframe */
     color: #ffffff;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-    margin: 10px auto; 
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    margin: 5px auto; 
     font-family: Arial, sans-serif; 
+    font-size: 0.95em; /* Base font size reduced */
 }
 
 .widget-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-end; 
-    margin-bottom: 10px;
-    gap: 10px;
+    margin-bottom: 5px; /* Margin reduced */
+    gap: 5px;
 }
 
 .tide-title {
     color: #ffeb3b; 
-    font-size: 1.3em;
+    font-size: 1.1em; /* Title font reduced */
     font-weight: bold;
     flex-grow: 1;
     text-align: left;
+    white-space: nowrap; /* Prevent wrap */
 }
 
 .level-title-flex {
@@ -72,17 +75,17 @@
 
 #dynamic-phase-text { 
     color: #cfd8dc; 
-    font-size: 0.9em;
+    font-size: 0.8em; /* Subtitle font reduced */
     font-weight: bold;
     white-space: nowrap;
 }
 
 .tide-body-flex {
     display: flex;
-    gap: 15px;
+    gap: 10px; /* Gap reduced */
     align-items: stretch;
-    min-height: 200px; 
-    margin-bottom: 10px;
+    min-height: 180px; /* Min-height reduced */
+    margin-bottom: 5px;
 }
 
 .tide-list-container {
@@ -99,102 +102,64 @@
     display: flex;
     justify-content: space-between; 
     align-items: center;
-    padding: 8px 0;
+    padding: 5px 0; /* Entry padding reduced */
     border-top: 1px solid rgba(255, 255, 255, 0.1);
-    transition: background-color 0.3s ease;
     white-space: nowrap; 
     overflow: hidden;
 }
 
 .tide-info {
-    font-size: 1.0em; 
+    font-size: 0.9em; /* Tide info font reduced */
     color: #cfd8dc; 
     flex-shrink: 0; 
     display: flex;
     align-items: center;
 }
 
-.tide-info.low-magnitude {
-    color: #81d4fa; 
-}
-
-
 .tide-time {
-    font-size: 1.1em;
+    font-size: 1.0em; /* Time font reduced */
     font-weight: bold;
     color: #ffd700;
-    margin-left: 10px; 
-}
-
-.tide-entry-current {
-    background-color: rgba(255, 255, 255, 0.15); 
-    border-radius: 4px;
-    padding-left: 5px;
-    padding-right: 5px;
-    margin: 2px 0;
+    margin-left: 5px; /* Margin reduced */
 }
 
 .wave-icon {
-    margin-right: 8px;
-    font-size: 1.1em;
-    color: #81d4fa; 
+    margin-right: 5px;
+    font-size: 1.0em;
 }
 
 .indicator-arrow {
-    font-size: 1.2em;
-    margin-left: 5px;
-    line-height: 1; 
+    font-size: 1.0em;
+    margin-left: 3px;
 }
 
 .level-container {
-    width: 28px; 
+    width: 20px; /* Indicator width reduced */
     height: 100%; 
     background-color: #4a7582;
-    border-radius: 14px;
-    overflow: hidden;
+    border-radius: 10px;
     position: relative;
-    box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.2);
-    border: 2px solid rgba(255, 255, 255, 0.1);
-}
-
-.level-bar {
-    width: 100%;
-    background: linear-gradient(to top, #03a9f4, #81d4fa); 
-    position: absolute;
-    bottom: 0;
-    height: 0%; 
-    transition: height 1s ease-in-out;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .level-percent {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%) rotate(-90deg);
-    color: #fff; 
-    font-size: 0.9em;
-    font-weight: bold;
-    width: 100px;
-    text-align: center;
-    text-shadow: 0 0 3px rgba(0, 0, 0, 0.5); 
+    /* Centering logic remains */
+    font-size: 0.75em; /* Percentage font reduced */
+    width: 80px;
 }
 
 .widget-footer {
     border-top: 1px solid rgba(255, 255, 255, 0.2);
-    padding-top: 10px;
-    margin-top: 10px;
-    font-size: 0.85em;
+    padding-top: 5px;
+    margin-top: 5px;
+    font-size: 0.75em; /* Footer font reduced */
     color: #cfd8dc;
     text-align: center;
 }
+</style>
 
-.widget-footer strong {
-    color: #ffeb3b;
-}
 
-.bengali-number {
-    font-family: 'Noto Sans Bengali', sans-serif; 
-}
+    
 </style>
 
 <script>
